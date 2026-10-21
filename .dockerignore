@@ -9,3 +9,18 @@ local_server/
 *.pyc
 .dockerignore
 Dockerfile
+
+# Include only the offline security gate and its public fixtures from tests.
+!tests/
+tests/*
+!tests/security/
+!tests/security/**
+!tests/dependencies/
+tests/dependencies/*
+!tests/dependencies/check_export_sources.py
+!README.md
+
+
+# Never include interpreter caches in the build context.
+**/__pycache__/
+**/*.pyc
