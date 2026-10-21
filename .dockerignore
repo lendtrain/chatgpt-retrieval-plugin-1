@@ -15,6 +15,9 @@ Dockerfile
 tests/*
 !tests/security/
 !tests/security/**
+!tests/dependencies/
+tests/dependencies/*
+!tests/dependencies/check_export_sources.py
 !README.md
 
 

@@ -9,6 +9,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tempfile
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures" / "emudhra"
 # Fixed while the fixtures are valid, so future expiry cannot mask bad trust.
@@ -17,6 +18,54 @@ TRUST_FAILURE = re.compile(
     r"error (?:2|20|21) at \d+ depth lookup: "
     r"unable to (?:get issuer certificate|get local issuer certificate|verify the first certificate)"
 )
+PEM_CERTIFICATE = re.compile(
+    rb"-----BEGIN (TRUSTED CERTIFICATE|CERTIFICATE)-----.*?-----END \1-----",
+    re.DOTALL,
+)
+HASHED_CA_NAME = re.compile(r"[0-9a-fA-F]{8}\.\d+\Z")
+
+
+def require_usable_ca_store(ca_args, cafile=None, capath=None):
+    """Prove a CA can verify through these stores, not just be read from disk.
+
+    CApath lookup is lazy and requires correctly hashed entries. Enumerating
+    candidate certificates is only discovery: OpenSSL must actually find a
+    trust anchor through the specified store arguments, without fallbacks.
+    In a combined store either source may supply that anchor.
+    """
+    sources = [cafile] if cafile is not None else []
+    if capath is not None:
+        sources.extend(sorted(
+            item for item in capath.iterdir()
+            if HASHED_CA_NAME.fullmatch(item.name) and item.is_file()
+        ))
+    with tempfile.TemporaryDirectory(prefix="ca-store-probe-") as directory:
+        probe = pathlib.Path(directory) / "candidate.pem"
+        for source in sources:
+            for match in PEM_CERTIFICATE.finditer(source.read_bytes()):
+                certificate = match.group(0) + b"\n"
+                purpose = subprocess.run(
+                    ["openssl", "x509", "-noout", "-purpose"],
+                    input=certificate, capture_output=True, timeout=10,
+                )
+                if purpose.returncode != 0 or not re.search(
+                        rb"^SSL server CA : Yes$", purpose.stdout, re.MULTILINE):
+                    continue
+                probe.write_bytes(certificate)
+                # This target is a CA, not a TLS leaf: the CA's server-signing
+                # purpose was checked above. Actual leaf checks below still
+                # enforce sslserver purpose and the requested hostname.
+                result = subprocess.run(
+                    ["openssl", "verify", "-attime", VERIFY_TIME,
+                     *ca_args, str(probe)],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if result.returncode == 0:
+                    return
+    raise RuntimeError(
+        "No usable CA trust anchor: OpenSSL could not verify a CA through "
+        "the configured CAfile/hashed CApath (with other stores disabled)"
+    )
 
 
 def python_default_ca_args():
@@ -25,16 +74,18 @@ def python_default_ca_args():
     cafile = pathlib.Path(paths.cafile) if paths.cafile else None
     capath = pathlib.Path(paths.capath) if paths.capath else None
     has_file = cafile is not None and cafile.is_file() and cafile.stat().st_size > 0
-    has_path = capath is not None and capath.is_dir() and any(
-        item.is_file() and item.stat().st_size > 0 for item in capath.iterdir()
-    )
+    has_path = capath is not None and capath.is_dir()
     if not has_file and not has_path:
-        raise RuntimeError("Python has no usable default CAfile or nonempty CApath")
-    return (
+        raise RuntimeError("Python has no usable default CAfile or hashed CApath")
+    args = (
         (["-CAfile", str(cafile)] if has_file else ["-no-CAfile"])
         + (["-CApath", str(capath)] if has_path else ["-no-CApath"])
         + ["-no-CAstore"]
     )
+    require_usable_ca_store(
+        args, cafile=cafile if has_file else None, capath=capath if has_path else None,
+    )
+    return args
 
 
 def verify_chain(chain, bundle=None, ca_args=None):
@@ -86,6 +137,10 @@ def main():
     for name, bundle, ca_args in stores:
         if bundle is not None and not bundle.is_file():
             raise RuntimeError(f"Missing CA bundle: {bundle}")
+        if bundle is not None:
+            require_usable_ca_store(
+                ["-CAfile", str(bundle), "-no-CApath", "-no-CAstore"], cafile=bundle,
+            )
         for chain in chains:
             result = verify_chain(chain, bundle, ca_args)
             detail = result.stdout + result.stderr

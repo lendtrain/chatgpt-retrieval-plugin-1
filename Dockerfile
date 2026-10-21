@@ -20,17 +20,19 @@ FROM trusted-python AS requirements-stage
 
 WORKDIR /tmp
 ENV POETRY_VIRTUALENVS_CREATE=false
-# Match the existing lock format and legacy secondary source setting.
+# Match the existing lock format.
 RUN python -m pip --isolated --disable-pip-version-check install --no-cache-dir "poetry==1.4.2"
 COPY ./pyproject.toml ./poetry.lock ./README.md /tmp/
+COPY ./tests/dependencies/check_export_sources.py /tmp/check_export_sources.py
 RUN poetry check \
-    && poetry export -f requirements.txt --output requirements.txt --without-hashes
+    && poetry export -f requirements.txt --output requirements.txt --without-hashes \
+    && python /tmp/check_export_sources.py /tmp/requirements.txt
 
 FROM trusted-python
 
 WORKDIR /code
 COPY --from=requirements-stage /tmp/requirements.txt /code/requirements.txt
-RUN python -m pip --isolated --disable-pip-version-check install --no-cache-dir --upgrade -r /code/requirements.txt \
+RUN python -m pip --isolated --disable-pip-version-check install --no-cache-dir --index-url https://pypi.org/simple --upgrade -r /code/requirements.txt \
     && python /tmp/security-tests/check_emudhra_trust.py
 
 COPY . /code/

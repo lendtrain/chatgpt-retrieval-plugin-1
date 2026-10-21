@@ -7,7 +7,14 @@ Run with the Python executable used by the application:
 This checks the system-default OpenSSL store, Python's resolved default
 CAfile/CApath, installed certifi and pip's vendored certifi independently
 against all 12 public incident chains. The Python-path check explicitly
-disables fallback for absent paths and requires a nonempty CAfile or CApath.
+disables fallback for absent paths. Before interpreting negative chain tests,
+it requires a CA certificate to verify through the configured CAfile/CApath.
+CApath candidates must actually be found by OpenSSL's hashed lookup: a
+nonempty directory, unhashed PEM, wrong hash or missing hash index is not
+positive evidence. Combined stores may obtain the trust anchor from either
+source, so an empty or ineffective CApath does not invalidate a usable CAfile.
+Explicit --bundle checks use the same positive preflight with all other
+stores disabled. No particular public root is required for this probe.
 These are offline OpenSSL chain checks, not live Python SSLContext handshakes.
 An accepted chain is a failure. Missing fixtures, malformed certificates,
 missing OpenSSL, expiry and unrelated failures are not passes.
@@ -25,6 +32,14 @@ that every library, override or deployed process uses these stores.
 Run the standard-library-only regression tests without importing the app:
 
     python -m unittest discover -s tests/security -p 'test_*.py'
+
+The suite uses the installed OpenSSL executable to generate a temporary
+self-signed CA and CA-signed server certificate with explicit validity dates
+covering the fixed evaluation time. It verifies real trusted-leaf success
+and wrong-hostname failure with CAfile-only, CApath-only and combined stores,
+as well as malformed/unhashed store failures. Temporary test keys are deleted
+with their temporary directory; no external network, application credentials,
+or changes to the host's trust stores are involved.
 
 ## Fixture provenance
 

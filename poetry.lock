@@ -265,7 +265,6 @@ category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "azure-search-documents-11.4.0a20230509004.zip", hash = "sha256:6cca144573161a10aa0fcd13927264453e79c63be6a53cf2ec241c9c8c22f6b5"},
     {file = "azure_search_documents-11.4.0a20230509004-py3-none-any.whl", hash = "sha256:6215e9a4f9e935ff3eac1b7d5519c6c0789b4497eb11242d376911aaefbb0359"},
 ]
 
@@ -275,10 +274,8 @@ azure-core = ">=1.24.0,<2.0.0"
 isodate = ">=0.6.0"
 
 [package.source]
-type = "legacy"
-url = "https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple"
-reference = "azure-sdk-dev"
-
+type = "url"
+url = "https://pkgs.dev.azure.com/azure-sdk/29ec6040-b234-4e31-b139-33dc4287b756/_packaging/3572dbf9-b5ef-433b-9137-fc4d7768e7cc/pypi/download/azure-search-documents/11.4a20230509004/azure_search_documents-11.4.0a20230509004-py3-none-any.whl#sha256=6215e9a4f9e935ff3eac1b7d5519c6c0789b4497eb11242d376911aaefbb0359"
 [[package]]
 name = "backoff"
 version = "2.2.1"
@@ -4736,4 +4733,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "3a261bda9160e8119824b5508f63b2c74b9fc5a6e636ef937c885fdaa77bfa79"
+content-hash = "060ed00a9e48d6cacbda822a973b9b5b38cb69f83fc79509beb62b5b5b011c04"

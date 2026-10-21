@@ -6,11 +6,6 @@ authors = ["isafulf <isabella@openai.com>"]
 readme = "README.md"
 packages = [{include = "server"}]
 
-[[tool.poetry.source]]
-name = "azure-sdk-dev"
-url = "https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple/"
-secondary = true
-
 [tool.poetry.dependencies]
 python = "^3.10"
 # emSign/eMudhra compromised-chain distrust (PSF security guidance, October 2026).
@@ -38,7 +33,8 @@ supabase = "^1.0.2"
 psycopg2 = "^2.9.5"
 llama-index = "0.5.4"
 azure-identity = "^1.12.0"
-azure-search-documents = {version = "11.4.0a20230509004", source = "azure-sdk-dev"}
+# Keep this preview wheel package-scoped; a global Azure index breaks unrelated packages.
+azure-search-documents = {url = "https://pkgs.dev.azure.com/azure-sdk/29ec6040-b234-4e31-b139-33dc4287b756/_packaging/3572dbf9-b5ef-433b-9137-fc4d7768e7cc/pypi/download/azure-search-documents/11.4a20230509004/azure_search_documents-11.4.0a20230509004-py3-none-any.whl#sha256=6215e9a4f9e935ff3eac1b7d5519c6c0789b4497eb11242d376911aaefbb0359"}
 pgvector = "^0.1.7"
 
 [tool.poetry.scripts]
