@@ -6,6 +6,7 @@ import json
 import pathlib
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 
@@ -18,7 +19,25 @@ TRUST_FAILURE = re.compile(
 )
 
 
-def verify_chain(chain, bundle=None):
+def python_default_ca_args():
+    """Use Python's resolved OpenSSL paths without any implicit fallback."""
+    paths = ssl.get_default_verify_paths()
+    cafile = pathlib.Path(paths.cafile) if paths.cafile else None
+    capath = pathlib.Path(paths.capath) if paths.capath else None
+    has_file = cafile is not None and cafile.is_file() and cafile.stat().st_size > 0
+    has_path = capath is not None and capath.is_dir() and any(
+        item.is_file() and item.stat().st_size > 0 for item in capath.iterdir()
+    )
+    if not has_file and not has_path:
+        raise RuntimeError("Python has no usable default CAfile or nonempty CApath")
+    return (
+        (["-CAfile", str(cafile)] if has_file else ["-no-CAfile"])
+        + (["-CApath", str(capath)] if has_path else ["-no-CApath"])
+        + ["-no-CAstore"]
+    )
+
+
+def verify_chain(chain, bundle=None, ca_args=None):
     command = [
         "openssl", "verify", "-purpose", "sslserver",
         "-verify_hostname", chain.stem, "-attime", VERIFY_TIME,
@@ -26,6 +45,8 @@ def verify_chain(chain, bundle=None):
     if bundle is not None:
         # Explicit bundle tests must not fall back to system CApath/CAstore.
         command += ["-CAfile", str(bundle), "-no-CApath", "-no-CAstore"]
+    elif ca_args is not None:
+        command += ca_args
     command += ["-untrusted", str(chain), str(chain)]
     return subprocess.run(command, capture_output=True, text=True, timeout=10)
 
@@ -51,19 +72,22 @@ def main():
     if actual != expected or len(expected) != 12:
         raise RuntimeError("Incident fixture names/content do not match SHA256SUMS.json")
     if args.bundle:
-        stores = [(str(args.bundle), args.bundle)]
+        stores = [(str(args.bundle), args.bundle, None)]
     else:
-        stores = [("system-default", None)]
+        stores = [
+            ("system-default", None, None),
+            ("python-default-paths", None, python_default_ca_args()),
+        ]
         if not args.system_only:
             for module_name in ("certifi", "pip._vendor.certifi"):
                 module = importlib.import_module(module_name)
-                stores.append((module_name, pathlib.Path(module.where())))
+                stores.append((module_name, pathlib.Path(module.where()), None))
     failures = []
-    for name, bundle in stores:
+    for name, bundle, ca_args in stores:
         if bundle is not None and not bundle.is_file():
             raise RuntimeError(f"Missing CA bundle: {bundle}")
         for chain in chains:
-            result = verify_chain(chain, bundle)
+            result = verify_chain(chain, bundle, ca_args)
             detail = result.stdout + result.stderr
             codes = {int(code) for code in re.findall(
                 r"error (\d+) at \d+ depth lookup:", detail)}

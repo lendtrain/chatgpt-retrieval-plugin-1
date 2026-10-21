@@ -4,8 +4,11 @@ Run with the Python executable used by the application:
 
     python tests/security/check_emudhra_trust.py
 
-This checks the system-default OpenSSL store, installed certifi and pip's
-vendored certifi independently against all 12 public incident chains.
+This checks the system-default OpenSSL store, Python's resolved default
+CAfile/CApath, installed certifi and pip's vendored certifi independently
+against all 12 public incident chains. The Python-path check explicitly
+disables fallback for absent paths and requires a nonempty CAfile or CApath.
+These are offline OpenSSL chain checks, not live Python SSLContext handshakes.
 An accepted chain is a failure. Missing fixtures, malformed certificates,
 missing OpenSSL, expiry and unrelated failures are not passes.
 Certificate validity is evaluated at 2026-10-21 00:00:00 UTC.
@@ -14,10 +17,14 @@ To test a specific bundle without system fallback:
 
     python tests/security/check_emudhra_trust.py --bundle /path/to/cacert.pem
 
-The Docker build checks system trust before dependency downloads, then all
-three stores after the patched pip/certifi bootstrap and after installing
-application dependencies. These are negative regression tests, not proof
+The Docker build checks system and Python default paths before dependency
+downloads, then all four checks after the patched pip/certifi bootstrap and
+after installing application dependencies. These are negative regression tests, not proof
 that every library, override or deployed process uses these stores.
+
+Run the standard-library-only regression tests without importing the app:
+
+    python -m unittest discover -s tests/security -p 'test_*.py'
 
 ## Fixture provenance
 
