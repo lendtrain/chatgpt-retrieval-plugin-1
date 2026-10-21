@@ -13,6 +13,8 @@ secondary = true
 
 [tool.poetry.dependencies]
 python = "^3.10"
+# emSign/eMudhra compromised-chain distrust (PSF security guidance, October 2026).
+certifi = ">=2026.10.19"
 fastapi = "^0.92.0"
 uvicorn = "^0.20.0"
 openai = "^0.27.5"
@@ -58,3 +60,4 @@ pythonpath = [
   "."
 ]
 asyncio_mode="auto"
+
